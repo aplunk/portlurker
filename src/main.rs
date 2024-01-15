@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_must_use)]
 use std::io;
+use std::str;
 use std::error::Error;
 use std::net::{ IpAddr, SocketAddr };
 use std::process::exit;
@@ -413,9 +414,19 @@ fn lurk(app: Arc<RwLock<App>>, socket: TcpListener, logchan: Sender<LogEntry>, b
             stream.as_mut().set_read_timeout_pinned(Some(io_timeout));
             stream.as_mut().set_write_timeout_pinned(Some(io_timeout));
             let local = match stream.get_ref().local_addr() { Ok(a) => a, Err(_) => continue };
+
             let peer = match stream.get_ref().peer_addr() {
                 Ok(addr) => addr,
-                Err(e) => { println!("{:>5} ? TCP ERR GETADDR: {}", local.port(), e.to_string()); continue; }
+                Err(e) => {
+                    // This could be a scanner, peek at the data
+                    let mut b1 = [0; 10];
+                    match stream.get_ref().peek(&mut b1).await {
+                        Ok(size) => size,
+                        Err(e) => { println!("PEAK ERR: {}", e.to_string()); 1}
+                    };
+                    println!("{:>5} ? TCP ERR GETADDR: {} data:{:?}", local.port(), e.to_string(), b1);
+                    continue;
+                }
             };
 
             println!("{:>5} + TCP ACK from {}", local.port(), peer);
