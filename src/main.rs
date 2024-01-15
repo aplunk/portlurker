@@ -157,10 +157,6 @@ fn to_dotline(bytes: &[u8]) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    println!("Portlurker v{}", VERSION);
-    println!("{}", str::replace(env!("CARGO_PKG_AUTHORS"), ":", "\n"));
-    println!("-----------------------------------------");
-
     let app = Arc::new(RwLock::new(App {
         print_ascii: false,
         print_binary: false,
@@ -291,18 +287,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::spawn(async move { log(rx, params.0, params.1, params.2).await });
     }
 
-    println!("\nStarting listeners on the following ports:");
     let mut tcp_ports: Vec<u16> = vec![];
     let mut transparent: bool = false;
     let count = Arc::new(AtomicUsize::new(0));
     for port in config["ports"].as_vec().unwrap() {
         if let Some(portno) = port["tcp"].as_i64() {
             tcp_ports.push(portno as u16);
-            println!("TCP port {}", portno);
             let mut banner = Arc::new(String::new());
             if let Some(x) = port["banner"].as_str() {
                 Arc::get_mut(& mut banner).unwrap().push_str(x);
-                println!("  with banner: {}", to_dotline(x.as_bytes()));
             }
             let app = app.clone();
             let logchan = tx.clone();
@@ -311,7 +304,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 Ok(socket) => {
                     if let Some(bool) = port["transparent"].as_bool() {
                         transparent = bool;
-                        println!("  transparent mode: true");
                         let res = setsockopt(&socket, IpTransparent, &true);
                         res.expect("ERROR setting sockopt IP_TRANSPARENT on TPROXY socket; this feature requires cap_net_raw or root privilege");
                     }
@@ -319,9 +311,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 },
                 Err(e) => { println!("ERROR binding to {}: {}", portno, e.to_string()) }
             };
-        }
-        else if let Some(udp) = port["udp"].as_i64() {
-            println!("UDP port {}", udp);
         }
         else {
             println!("Invalid port specification in configuration file");
